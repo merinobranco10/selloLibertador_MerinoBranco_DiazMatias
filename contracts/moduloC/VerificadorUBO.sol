@@ -67,8 +67,46 @@ contract VerificadorUBO is IVerificadorUBO {
         view
         returns (Veredicto veredicto, string memory explicacion)
     {
-        // TODO
-        localizador; compromisoRecalculado; veredicto; explicacion;
-        revert("TODO: verificarConExplicacion");
+    // Obtener el veredicto usando la lógica del verificador.
+        veredicto = this.verificar(localizador, compromisoRecalculado);
+        if (veredicto == Veredicto.Valido) {
+            explicacion = "El titulo es valido.";
+            return (veredicto, explicacion);
+            } 
+        if (veredicto == Veredicto.Revocado) {
+            IRegistroTitulos.Titulo memory titulo =
+                titulos.obtenerTitulo(localizador);
+
+            if (titulo.rectificadoComo != bytes10(0)) {
+                bytes memory nuevoLocalizador = new bytes(10);
+                for (uint256 i = 0; i < 10; i++) {
+                    nuevoLocalizador[i] = titulo.rectificadoComo[i];
+                    }
+                    explicacion = string.concat(
+                        "El titulo fue rectificado. Nuevo localizador: ",
+                        string(nuevoLocalizador)
+                    );
+                    return (veredicto, explicacion);
+            } else {
+                explicacion = "El titulo fue revocado.";
+                }
+            return (veredicto, explicacion);
+            }
+        if (veredicto == Veredicto.Suspendido) {
+            explicacion = "El titulo esta suspendido.";
+            return (veredicto, explicacion);
+            } 
+        if (veredicto == Veredicto.Inexistente) {
+            explicacion = "No existe un titulo con ese localizador.";
+            return (veredicto, explicacion);
+            } 
+        if (veredicto == Veredicto.EmisorNoAutorizado) {
+            explicacion = "El emisor no estaba autorizado en la fecha de emision.";
+            return (veredicto, explicacion);
+            } 
+        if (veredicto == Veredicto.DocumentoAlterado) {
+            explicacion = "El documento no coincide con el compromiso registrado.";
+            return (veredicto, explicacion);
+            }
     }
 }
