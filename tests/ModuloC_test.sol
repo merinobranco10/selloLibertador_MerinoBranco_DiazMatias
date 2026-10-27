@@ -77,21 +77,110 @@ contract ModuloCTest {
 
     // ---------- PRUEBAS OBLIGATORIAS (completar) ----------
     function veredictosInexistenteYEmisorNoAutorizado() public {
-        // TODO: un localizador nunca emitido -> Inexistente;
-        //       fijarPeriodo() que empiece DESPUÉS de fechaEmision -> EmisorNoAutorizado
-        Assert.ok(false, "TODO");
+    // 1. Un localizador nunca emitido debe devolver Inexistente.
+    bytes10 localizadorInexistente = bytes10("NOEXISTE01");
+
+    Assert.equal(
+        uint(verificador.verificar(localizadorInexistente, bytes32(0))),
+        uint(IVerificadorUBO.Veredicto.Inexistente),
+        "Un localizador nunca emitido debe ser Inexistente"
+    );
+
+    // 2. Crear un título válido.
+    bytes10 localizador = bytes10("TITULO0001");
+    _tituloValido(localizador);
+
+    // 3. Hacer que el periodo de autorización comience después
+    //    de la fecha de emisión del título.
+    registro.fijarPeriodo(
+        emisorIng,
+        ConstantesUBO.ING,
+        uint64(block.timestamp + 100),
+        0
+    );
+
+    // 4. Verificar que el emisor no estaba autorizado al emitirlo.
+    Assert.equal(
+        uint(verificador.verificar(localizador, bytes32(0))),
+        uint(IVerificadorUBO.Veredicto.EmisorNoAutorizado),
+        "Debe devolver EmisorNoAutorizado"
+    );
     }
 
     function veredictosRevocadoSuspendidoYOrden() public {
         // TODO: suspender -> Suspendido; revocar -> Revocado;
         //       un título revocado Y con documento alterado debe dar Revocado
-        Assert.ok(false, "TODO");
+        bytes10 localizadorSuspendido = bytes10("SUSPEND001");
+        bytes32 compromisoSuspendido = _tituloValido(localizadorSuspendido);
+        titulos.suspender(localizadorSuspendido, 1);
+
+        Assert.equal(
+            uint(verificador.verificar(localizadorSuspendido, compromisoSuspendido)),
+            uint(IVerificadorUBO.Veredicto.Suspendido),
+            "Un titulo suspendido debe devolver Suspendido"
+        );
+
+        // 2. Crear otro título y revocarlo.
+        bytes10 localizadorRevocado = bytes10("REVOCADO01");
+        bytes32 compromisoRevocado = _tituloValido(localizadorRevocado);
+
+        titulos.revocar(localizadorRevocado, 1);
+
+        Assert.equal(
+            uint(verificador.verificar(localizadorRevocado, compromisoRevocado)),
+            uint(IVerificadorUBO.Veredicto.Revocado),
+            "Un titulo revocado debe devolver Revocado"
+        );
+
+        // 3. Un título revocado con documento alterado debe seguir
+        //    devolviendo Revocado.
+        bytes32 compromisoAlterado = ConstantesUBO.compromiso(
+            SAL_,
+            keccak256('{"programa":"ING-INFORMATICB"}')
+        );
+
+        Assert.equal(
+            uint(verificador.verificar(localizadorRevocado, compromisoAlterado)),
+            uint(IVerificadorUBO.Veredicto.Revocado),
+            "Revocado debe tener prioridad sobre DocumentoAlterado"
+        );
     }
 
     function explicacionDeRectificacion() public {
         // TODO: rectificar L1 a otro localizador con el simulacro y comprobar que
         //       verificarConExplicacion(L1, ...) menciona el nuevo localizador
-        Assert.ok(false, "TODO");
+        // 1. Crear el título original.
+        bytes32 compromiso = _tituloValido(L1);
+
+        // 2. Definir un nuevo localizador de exactamente 10 caracteres.
+        bytes10 nuevoLocalizador = bytes10("RECTIF0001");
+
+        // 3. Rectificar el título original.
+        bytes32 nuevoCompromiso = ConstantesUBO.compromiso(
+            SAL_,
+            keccak256('{"programa":"ING-INFORMATICA-CORREGIDO"}')
+        );
+
+        titulos.rectificar(L1, nuevoLocalizador, nuevoCompromiso);
+
+        // 4. Verificar que el título original esté revocado.
+        (
+            IVerificadorUBO.Veredicto veredicto,
+            string memory explicacion
+        ) = verificador.verificarConExplicacion(L1, compromiso);
+
+        Assert.equal(
+            uint(veredicto),
+            uint(IVerificadorUBO.Veredicto.Revocado),
+            "El titulo original debe quedar revocado"
+        );
+
+        // 5. Comprobar que la explicación mencione el nuevo localizador.
+        Assert.equal(
+        explicacion,
+        "El titulo fue rectificado. Nuevo localizador: RECTIF0001",
+        "La explicacion debe mencionar el nuevo localizador"
+);
     }
 
     function loteYPruebasDeInclusion() public {
